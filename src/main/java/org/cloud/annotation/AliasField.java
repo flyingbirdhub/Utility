@@ -12,4 +12,14 @@ public @interface AliasField {
      * 定义支持的别名列表，默认为空
      */
     String[] name() default {};
+
+    /**
+     * 定义getter的返回到setter的转换类路径
+     */
+    String methodClass() default "";
+
+    /**
+     * 定义转换类中的具体方法
+     */
+    String methodName() default "";
 }

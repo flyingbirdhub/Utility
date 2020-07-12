@@ -1,7 +1,5 @@
 package org.cloud.demo;
 
-import org.cloud.annotation.AliasField;
-
 public class UserTable {
     public UserTable(long id, String des){
         this.id = id;
@@ -10,8 +8,9 @@ public class UserTable {
 
     private long id;
 
-    @AliasField(name={"content"})
     private String des;
+
+    private String userId;
 
     public long getId(){
         return id;
@@ -19,5 +18,9 @@ public class UserTable {
 
     public String getDes(){
         return des;
+    }
+
+    public String getUserId(){
+        return userId;
     }
 }

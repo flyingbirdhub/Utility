@@ -28,38 +28,39 @@ public class Convert {
         Map<String, Method> getterMethods = getPublicGetMethod(sourceClazz);
         Map<String, Method> setterMethods = getPublicSetMethod(targetClazz);
         Field[] sourceFields = sourceClazz.getDeclaredFields();
-        for(Field field: sourceFields){
-            // 判断该field是否有get方法
-            String getterName = convertGetMethod(field.getName());
-            if(!getterMethods.containsKey(getterName)){
+        Field[] targetFields = targetClazz.getDeclaredFields();
+        for(Field field: targetFields){
+            // 判断该field是否有setter方法
+            String setterName = convertSetMethod(field.getName());
+            if(!setterMethods.containsKey(setterName)){
                 continue;
             }
-            Method getterMethod = getterMethods.get(getterName);
+            Method setterMethod = setterMethods.get(setterMethods);
 
             // 注解优先
             AliasField aliasField = field.getAnnotation(AliasField.class);
-            Method setterMethod = null;
+            Method getterMethod = null;
             if(aliasField != null){
                 String[] names = aliasField.name();
                 for(String name: names){
-                    String setterName = convertSetMethod(name);
-                    if(setterMethods.containsKey(setterName)){
-                        setterMethod = setterMethods.get(setterName);
+                    String getterName = convertGetMethod(name);
+                    if(getterMethods.containsKey(getterName)){
+                        getterMethod = getterMethods.get(getterName);
                         break;
                     }
                 }
             }
 
-            // 注解没有找到，则用属性名称
-            if(setterMethod == null){
-                String setterName = convertSetMethod(field.getName());
-                if(setterMethods.containsKey(setterName)){
-                    setterMethod = setterMethods.get(setterName);
+            // 没有找到注解，则用属性名称
+            if(getterMethod == null){
+                String getterName = convertGetMethod(field.getName());
+                if(getterMethods.containsKey(getterName)){
+                    getterMethod = getterMethods.get(getterName);
                 }
             }
 
-            // 进行属性注入
-            if(setterMethod != null){
+            // 注入属性值
+            if(getterMethod != null){
                 convertValue(target, setterMethod, source, getterMethod);
             }
         }
