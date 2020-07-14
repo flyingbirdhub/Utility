@@ -4,6 +4,7 @@ import org.cloud.convert.Convert;
 import org.cloud.demo.UserProtocol;
 import org.cloud.demo.UserTable;
 
+// TODO：加入Commons-Logging日志模块
 public class UtilityApplication {
     public static void main(String[] args){
         System.out.println("utility application run...");
