@@ -2,8 +2,9 @@ package org.cloud.convert;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.cloud.ConvertException;
+import org.cloud.exception.ConvertException;
 import org.cloud.annotation.AliasField;
+import sun.security.x509.AttributeNameEnumeration;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -39,18 +40,21 @@ public class Convert {
             if(!setterMethods.containsKey(setterName)){
                 continue;
             }
-            Method setterMethod = setterMethods.get(setterMethods);
+            Method setterMethod = setterMethods.get(setterName);
 
             // 注解优先
             AliasField aliasField = field.getAnnotation(AliasField.class);
             Method getterMethod = null;
-            List<String> names = new ArrayList<String>();
+            List<String> names = new ArrayList<>();
             ConvertMethod propertyConvertMethod = null;
             if(aliasField != null){
-                names = Arrays.asList(aliasField.name());
-                propertyConvertMethod = instancePropertyConvertMethod(aliasField.methodClass(), aliasField.methodName(), targetClazz, target);
+                names.addAll(Arrays.asList(aliasField.name()));
+                if(aliasField.methodName() != null && aliasField.methodName().length() > 0){
+                    propertyConvertMethod = instancePropertyConvertMethod(aliasField.methodClass(), aliasField.methodName(), targetClazz, target, aliasField.parameters());
+                }
             }
             names.add(field.getName());
+            names = convertGetterMethod(names);
             getterMethod = findTargetMethod(names, getterMethods);
 
             // 注入属性值
@@ -64,13 +68,16 @@ public class Convert {
         }
     }
 
-    private static <T> ConvertMethod instancePropertyConvertMethod(String className, String methodName, Class<?> target, T obj) throws ConvertException{
+    private static <T> ConvertMethod instancePropertyConvertMethod(String className, String methodName, Class<?> target, T obj, Class[] params) throws ConvertException{
         /**
          * 1. className is null, get convert method from target class
          * 2. className is not null, get convert method from className's class
          * 3. methodName is not null, else return null
          */
         if(methodName == null || methodName.length() < 1){
+            if(log.isDebugEnabled()){
+                log.debug("method cannot be empty!");
+            }
             return null;
         }
 
@@ -78,7 +85,7 @@ public class Convert {
         if(className == null || className.length() < 1){
             convertMethod.clazz = target;
             try {
-                convertMethod.method = convertMethod.clazz.getMethod(methodName);
+                convertMethod.method = convertMethod.clazz.getMethod(methodName, params);
                 convertMethod.clazz = target;
                 int modifiers = convertMethod.method.getModifiers();
                 convertMethod.isStatic = Modifier.isStatic(modifiers);
@@ -124,6 +131,22 @@ public class Convert {
             }
         }
         return convertMethod;
+    }
+
+    private static List<String> convertGetterMethod(List<String> names){
+        List<String> result = new ArrayList<>();
+        for(int i=0; i<names.size(); i++){
+            result.add(convertGetMethod(names.get(i)));
+        }
+        return result;
+    }
+
+    private static List<String> convertSetterMethod(List<String> names){
+        List<String> result = new ArrayList<>();
+        for(int i=0; i<names.size(); i++){
+            result.add(convertSetMethod(names.get(i)));
+        }
+        return result;
     }
 
     private static Method findTargetMethod(List<String> names, Map<String, Method> methods){

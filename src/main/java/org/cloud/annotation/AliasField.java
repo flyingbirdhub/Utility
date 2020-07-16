@@ -25,4 +25,9 @@ public @interface AliasField {
      * 2. methodClass不为空，则从指定的class方法进行调用
      */
     String methodName() default "";
+
+    /**
+     * 方法的参数
+     */
+    Class[] parameters() default {};
 }

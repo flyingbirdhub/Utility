@@ -1,4 +1,4 @@
-package org.cloud;
+package org.cloud.exception;
 
 public class ConvertException extends Exception {
     public ConvertException(String msg){

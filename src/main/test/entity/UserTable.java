@@ -1,9 +1,10 @@
-package org.cloud.demo;
+package entity;
 
 public class UserTable {
-    public UserTable(long id, String des){
+    public UserTable(long id, String des, String userId){
         this.id = id;
         this.des = des;
+        this.userId = userId;
     }
 
     private long id;
