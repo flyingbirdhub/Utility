@@ -68,7 +68,7 @@ public class Convert {
         }
     }
 
-    private static <T> ConvertMethod instancePropertyConvertMethod(String className, String methodName, Class<?> target, T obj, Class[] params) throws ConvertException{
+    private static <T> ConvertMethod instancePropertyConvertMethod(Class clazz, String methodName, Class<?> target, T obj, Class[] params) throws ConvertException{
         /**
          * 1. className is null, get convert method from target class
          * 2. className is not null, get convert method from className's class
@@ -82,7 +82,7 @@ public class Convert {
         }
 
         ConvertMethod convertMethod = new ConvertMethod();
-        if(className == null || className.length() < 1){
+        if(clazz==null || clazz == Class.class){
             convertMethod.clazz = target;
             try {
                 convertMethod.method = convertMethod.clazz.getMethod(methodName, params);
@@ -102,8 +102,8 @@ public class Convert {
         }
         else {
             try {
-                convertMethod.clazz = Class.forName(className);
-                convertMethod.method  = convertMethod.clazz.getMethod(methodName);
+                convertMethod.clazz = clazz;
+                convertMethod.method  = convertMethod.clazz.getMethod(methodName, params);
                 int modifiers = convertMethod.method.getModifiers();
                 convertMethod.isStatic = Modifier.isStatic(modifiers);
                 if(!convertMethod.isStatic){
@@ -111,21 +111,15 @@ public class Convert {
                 }
                 return convertMethod;
             }
-            catch (ClassNotFoundException e){
-                if(log.isInfoEnabled()){
-                    log.info("class not found for ["+className+"]", e);
-                }
-                throw new ConvertException(e);
-            }
             catch (NoSuchMethodException e){
                 if(log.isInfoEnabled()){
-                    log.info("method ["+methodName+"] not found in class ["+className+"]", e);
+                    log.info("method ["+methodName+"] not found in class ["+clazz.getName()+"]", e);
                 }
                 throw new ConvertException(e);
             }
             catch (InstantiationException | IllegalAccessException e){
                 if(log.isInfoEnabled()){
-                    log.info("instance class ["+className+"] error", e);
+                    log.info("instance class ["+clazz.getName()+"] error", e);
                 }
                 throw new ConvertException(e);
             }

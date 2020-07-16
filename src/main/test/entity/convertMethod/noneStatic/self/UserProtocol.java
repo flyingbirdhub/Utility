@@ -1,5 +1,6 @@
-package entity;
+package entity.convertMethod.noneStatic.self;
 
+import entity.UserTable;
 import org.cloud.annotation.AliasField;
 
 public class UserProtocol {
@@ -15,13 +16,13 @@ public class UserProtocol {
         this.content = content;
     }
 
-    @AliasField(methodName = "String2Int", parameters = {String.class})
-    private long userId;
-    public void setUserId(long userId){
-        this.userId = userId;
+    @AliasField(name={"userId"}, methodName = "String2Int", parameters = {String.class})
+    private long selfId;
+    public void setSelfId(long userId){
+        this.selfId = userId;
     }
 
-    public static int String2Int(String userId){
+    public int String2Int(String userId){
         return Integer.valueOf(userId);
     }
 
@@ -35,14 +36,19 @@ public class UserProtocol {
         }
         else if(object instanceof UserTable){
             UserTable target = (UserTable)object;
-            return id == target.getId() && content.equals(target.getDes()) && userId == Integer.valueOf(target.getUserId());
+            return id == target.getId() && content.equals(target.getDes()) && selfId == Integer.valueOf(target.getUserId());
         }
         else if(object instanceof UserProtocol){
             UserProtocol target = (UserProtocol)object;
-            return id == target.id && content.equals(target.content) && userId == target.userId;
+            return id == target.id && content.equals(target.content) && selfId == target.selfId;
         }
         else {
             return false;
         }
+    }
+
+    @Override
+    public String toString() {
+        return id+"-"+content+"-"+selfId;
     }
 }

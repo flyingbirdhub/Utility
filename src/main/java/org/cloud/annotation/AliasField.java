@@ -16,7 +16,7 @@ public @interface AliasField {
     /**
      * 定义getter的返回到setter的转换类路径
      */
-    String methodClass() default "";
+    Class methodClass() default Class.class;
 
     /**
      * 定义转换类中的具体方法
