@@ -158,5 +158,5 @@ UserProtocol userProtocol = new UserProtocol();
 Convert.convert(userProtocol, userTable);
 ```
 
-### 更多使用方法请见代码中的单元测试案例
+### [更多使用方法请见代码中的单元测试案例](https://github.com/chinazhonghao/Utility.git)
 
