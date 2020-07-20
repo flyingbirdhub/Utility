@@ -4,7 +4,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.cloud.exception.ConvertException;
 import org.cloud.annotation.AliasField;
-import sun.security.x509.AttributeNameEnumeration;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -20,23 +19,20 @@ public class Convert {
     /**
      * @param target 对应属性需要有相应的set方法方能赋值成功
      * @param source 对应属性需要有相应的get方法访问获取值
-     * TODO: 优化方向
-     *        1. 提供选择是否抛出异常选项
-     *        2. 当setter传入参数类型与getter返回类型不一致时，用户可以提供转换方法
      */
     public static <T,S> void convert(T target, S source) throws ConvertException{
-        Class<?> sourceClazz = source.getClass();
-        Class<?> targetClazz = target.getClass();
+        Class sourceClazz = source.getClass();
+        Class targetClazz = target.getClass();
         if(log.isDebugEnabled()){
             log.debug("begin to convert source["+sourceClazz+"] to target["+targetClazz+"]");
         }
 
-        Map<String, Method> getterMethods = getPublicGetMethod(sourceClazz);
-        Map<String, Method> setterMethods = getPublicSetMethod(targetClazz);
+        Map<String, Method> getterMethods = ConvertUtil.getPublicGetMethod(sourceClazz);
+        Map<String, Method> setterMethods = ConvertUtil.getPublicSetMethod(targetClazz);
         Field[] targetFields = targetClazz.getDeclaredFields();
         for(Field field: targetFields){
             // 判断该field是否有setter方法
-            String setterName = convertSetMethod(field.getName());
+            String setterName = ConvertUtil.convertSetMethod(field.getName());
             if(!setterMethods.containsKey(setterName)){
                 continue;
             }
@@ -44,18 +40,18 @@ public class Convert {
 
             // 注解优先
             AliasField aliasField = field.getAnnotation(AliasField.class);
-            Method getterMethod = null;
+            Method getterMethod;
             List<String> names = new ArrayList<>();
             ConvertMethod propertyConvertMethod = null;
             if(aliasField != null){
                 names.addAll(Arrays.asList(aliasField.name()));
                 if(aliasField.methodName() != null && aliasField.methodName().length() > 0){
-                    propertyConvertMethod = instancePropertyConvertMethod(aliasField.methodClass(), aliasField.methodName(), targetClazz, target, aliasField.parameters());
+                    propertyConvertMethod = instancePropertyConvertMethod(aliasField.methodClass(), aliasField.methodName(), target, aliasField.parameters());
                 }
             }
             names.add(field.getName());
-            names = convertGetterMethod(names);
-            getterMethod = findTargetMethod(names, getterMethods);
+            names = ConvertUtil.convertGetterMethod(names);
+            getterMethod = ConvertUtil.findTargetMethod(names, getterMethods);
 
             // 注入属性值
             if(getterMethod != null){
@@ -68,88 +64,52 @@ public class Convert {
         }
     }
 
-    private static <T> ConvertMethod instancePropertyConvertMethod(Class clazz, String methodName, Class<?> target, T obj, Class[] params) throws ConvertException{
+    private static <T> ConvertMethod instancePropertyConvertMethod(Class convertClazz, String convertMethodName, T obj, Class[] params) throws ConvertException{
         /**
          * 1. className is null, get convert method from target class
          * 2. className is not null, get convert method from className's class
          * 3. methodName is not null, else return null
          */
-        if(methodName == null || methodName.length() < 1){
+        if(convertMethodName == null || convertMethodName.length() < 1){
             if(log.isDebugEnabled()){
                 log.debug("method cannot be empty!");
             }
             return null;
         }
 
+        Class targetClazz = convertClazz;
+        boolean isConvertClazz = true;
+        if(convertClazz==null || convertClazz==Class.class){
+            isConvertClazz = false;
+            targetClazz = obj.getClass();
+        }
+
         ConvertMethod convertMethod = new ConvertMethod();
-        if(clazz==null || clazz == Class.class){
-            convertMethod.clazz = target;
-            try {
-                convertMethod.method = convertMethod.clazz.getMethod(methodName, params);
-                convertMethod.clazz = target;
-                int modifiers = convertMethod.method.getModifiers();
-                convertMethod.isStatic = Modifier.isStatic(modifiers);
-                if(!Modifier.isStatic(modifiers)){
+        try {
+            convertMethod.method = targetClazz.getMethod(convertMethodName, params);
+            int modifiers = convertMethod.method.getModifiers();
+            if(!Modifier.isStatic(modifiers)){
+                if(!isConvertClazz){
                     convertMethod.obj = obj;
                 }
-            }
-            catch (NoSuchMethodException e){
-                if(log.isInfoEnabled()){
-                    log.info("method ["+methodName+"] not found in class ["+target.getName()+"]", e);
+                else {
+                    convertMethod.obj = targetClazz.newInstance();
                 }
-                throw new ConvertException(e);
             }
         }
-        else {
-            try {
-                convertMethod.clazz = clazz;
-                convertMethod.method  = convertMethod.clazz.getMethod(methodName, params);
-                int modifiers = convertMethod.method.getModifiers();
-                convertMethod.isStatic = Modifier.isStatic(modifiers);
-                if(!convertMethod.isStatic){
-                    convertMethod.obj = convertMethod.clazz.newInstance();
-                }
-                return convertMethod;
+        catch (NoSuchMethodException e){
+            if(log.isInfoEnabled()){
+                log.info("method ["+convertMethodName+"] not found in class ["+targetClazz.getName()+"]", e);
             }
-            catch (NoSuchMethodException e){
-                if(log.isInfoEnabled()){
-                    log.info("method ["+methodName+"] not found in class ["+clazz.getName()+"]", e);
-                }
-                throw new ConvertException(e);
+            throw new ConvertException(e);
+        }
+        catch (InstantiationException | IllegalAccessException e){
+            if(log.isInfoEnabled()){
+                log.info("instance class ["+convertClazz.getName()+"] error", e);
             }
-            catch (InstantiationException | IllegalAccessException e){
-                if(log.isInfoEnabled()){
-                    log.info("instance class ["+clazz.getName()+"] error", e);
-                }
-                throw new ConvertException(e);
-            }
+            throw new ConvertException(e);
         }
         return convertMethod;
-    }
-
-    private static List<String> convertGetterMethod(List<String> names){
-        List<String> result = new ArrayList<>();
-        for(int i=0; i<names.size(); i++){
-            result.add(convertGetMethod(names.get(i)));
-        }
-        return result;
-    }
-
-    private static List<String> convertSetterMethod(List<String> names){
-        List<String> result = new ArrayList<>();
-        for(int i=0; i<names.size(); i++){
-            result.add(convertSetMethod(names.get(i)));
-        }
-        return result;
-    }
-
-    private static Method findTargetMethod(List<String> names, Map<String, Method> methods){
-        for(String name: names){
-            if(methods.containsKey(name)){
-                return methods.get(name);
-            }
-        }
-        return null;
     }
 
     private static <T, S> void convertValue(T target, Method setter, S source, Method getter, ConvertMethod convertMethod) throws ConvertException {
@@ -161,19 +121,44 @@ public class Convert {
             setter.invoke(target, param);
         }
         catch (Exception e){
+            if(log.isInfoEnabled()){
+                log.info("convert property failed, setter["+setter.getName()+"], getter["+getter.getName()+"]");
+            }
             throw new ConvertException(e);
         }
     }
+}
 
-    /**
-     * @param clazz
-     * @return key: 方法名称，Method当前方法
-     */
-    private static Map<String, Method> getPublicGetMethod(Class clazz){
+class ConvertMethod {
+    // target method
+    Method method;
+    // target obj invoked by method
+    Object obj;
+}
+
+class ConvertUtil {
+    public static List<String> convertGetterMethod(List<String> names){
+        List<String> result = new ArrayList<>();
+        for(int i=0; i<names.size(); i++){
+            result.add(ConvertUtil.convertGetMethod(names.get(i)));
+        }
+        return result;
+    }
+
+    public static Method findTargetMethod(List<String> names, Map<String, Method> methods){
+        for(String name: names){
+            if(methods.containsKey(name)){
+                return methods.get(name);
+            }
+        }
+        return null;
+    }
+
+    public static Map<String, Method> getPublicGetMethod(Class clazz){
         return filterTargetPrefixMethod(clazz, "get");
     }
 
-    private static Map<String, Method> getPublicSetMethod(Class clazz){
+    public static Map<String, Method> getPublicSetMethod(Class clazz){
         return filterTargetPrefixMethod(clazz, "set");
     }
 
@@ -201,11 +186,11 @@ public class Convert {
         return methods;
     }
 
-    private static String convertGetMethod(String name){
+    public static String convertGetMethod(String name){
         return "get"+upperFirstCharacter(name);
     }
 
-    private static String convertSetMethod(String name){
+    public static String convertSetMethod(String name){
         return "set"+upperFirstCharacter(name);
     }
 
@@ -216,11 +201,4 @@ public class Convert {
         }
         return name.substring(0, 1).toUpperCase()+name.substring(1);
     }
-}
-
-class ConvertMethod {
-    Method method;
-    Class<?> clazz;
-    boolean isStatic;
-    Object obj;
 }

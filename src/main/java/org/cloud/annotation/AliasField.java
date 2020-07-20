@@ -20,9 +20,6 @@ public @interface AliasField {
 
     /**
      * 定义转换类中的具体方法
-     * TODO：
-     * 1. methodClass为空，默认从函数本身进行方法调用
-     * 2. methodClass不为空，则从指定的class方法进行调用
      */
     String methodName() default "";
 
